@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Retalla graella A5</title>
+<title>Caselles automàtiques</title>
 <style>
   :root { --bg:#f5f6f8; --card:#fff; --tx:#1d2330; --mut:#667085; --ac:#2563eb; --bd:#d9dde5; --ok:#16a34a; }
   @media (prefers-color-scheme: dark) {
@@ -24,82 +24,86 @@
   .stage { position:relative; width:100%; max-width:720px; background:#000; border-radius:8px; overflow:hidden; }
   .stage video, .stage canvas { display:block; width:100%; height:auto; }
   .stage canvas.over { position:absolute; inset:0; }
-  #fixCanvas { touch-action:none; cursor:crosshair; }
   .status { color:var(--mut); font-size:.9rem; min-height:1.3em; }
   .status.ok { color:var(--ok); }
   label { display:flex; flex-direction:column; font-size:.8rem; color:var(--mut); gap:2px; }
-  input[type=number] { width:90px; padding:6px; border:1px solid var(--bd); border-radius:6px; background:var(--bg); color:var(--tx); font:inherit; }
+  label.inl { flex-direction:row; align-items:center; gap:8px; color:var(--tx); font-size:.9rem; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; margin-top:12px; }
   .cell { border:1px solid var(--bd); border-radius:8px; padding:6px; text-align:center; font-size:.75rem; word-break:break-all; }
-  .cell img { width:100%; image-rendering:auto; border-radius:4px; display:block; margin-bottom:4px; background:#fff; }
+  .cell img { width:100%; border-radius:4px; display:block; margin-bottom:4px; background:#fff; }
   .cell a { color:var(--ac); }
   .hidden { display:none; }
+  button, .btn, input, label { touch-action:manipulation; }
+  @media (max-width:640px) {
+    main { padding:10px; }
+    section { padding:12px; }
+    h1 { font-size:1.2rem; }
+    button, .btn { padding:12px 14px; min-height:44px; }      /* mida còmoda per al dit */
+    input[type=number] { font-size:16px; min-height:40px; }   /* 16px evita el zoom automàtic d'iOS */
+    .row { gap:10px; }
+    .grid { grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>Retalla graella A5</h1>
-  <p class="sub">Fes una foto d'un full A5 amb graella de caselles de 2×2 cm i obtén una imatge per casella (A1, A2…). Tot es processa al teu navegador; no es puja res enlloc.</p>
+  <h1>Caselles automàtiques</h1>
+  <p class="sub">Fes una foto (o carrega-la) d'un full amb una graella de caselles, encara que tinguin lletres dins. L'aplicació detecta cada casella sola, sense marques ni vores del paper, i en genera una imatge per casella (A1, A2…). Tot es processa al navegador.</p>
 
   <section>
-    <h2><span>1</span>Càmera</h2>
-    <div class="stage">
-      <video id="video" playsinline muted></video>
-      <canvas id="liveOver" class="over"></canvas>
-    </div>
+    <h2><span>1</span>Foto</h2>
+    <div class="stage"><video id="video" playsinline muted></video></div>
     <div class="row">
       <button id="btnCam">Obrir càmera</button>
       <button id="btnShot" disabled>📷 Fer foto</button>
+      <label class="btn" style="flex-direction:row;color:#fff">📱 Càmera del mòbil
+        <input id="fileCam" type="file" accept="image/*" capture="environment" hidden>
+      </label>
       <label class="btn sec" style="flex-direction:row;color:var(--ac)">Carregar imatge…
         <input id="file" type="file" accept="image/*" hidden>
       </label>
     </div>
     <div id="camStatus" class="status">Carregant OpenCV…</div>
-    <div class="status">Consell: posa el full sobre un fons de color fosc i uniforme, amb bona llum i sense ombres. El contorn verd mostra què detecta.</div>
+    <div class="status">Consell: enfoca la graella sencera, amb la càmera ben perpendicular al full. Al mòbil, «Càmera del mòbil» obre l'app de càmera (millor enfocament i resolució) i torna amb la foto feta. Les ombres i les lletres a dins de les caselles no són problema.</div>
   </section>
 
-  <section id="secFix" class="hidden">
-    <h2><span>2</span>Ajusta les vores del paper</h2>
-    <p class="status">Si la detecció no és exacta, arrossega les 4 puntes.</p>
-    <div class="stage"><canvas id="fixCanvas"></canvas></div>
+  <section id="secDet" class="hidden">
+    <h2><span>2</span>Caselles detectades</h2>
     <div class="row">
-      <button id="btnRect">Endreça perspectiva</button>
-      <button id="btnRedetect" class="sec">Tornar a detectar</button>
-    </div>
-  </section>
-
-  <section id="secGrid" class="hidden">
-    <h2><span>3</span>Graella i retall</h2>
-    <div class="row">
-      <label>Columnes<input id="cols" type="number" min="1" max="30" value="6"></label>
-      <label>Files<input id="rows" type="number" min="1" max="40" value="9"></label>
-      <label>Distància marca→graella (mm)<input id="markOff" type="number" min="0" step="0.5" value="6"></label>
-      <label>Retall intern (mm)<input id="inset" type="number" min="0" max="5" step="0.1" value="0.8"></label>
-      <label>Casella calculada (mm)<input id="cell" type="number" readonly value="20"></label>
-      <input id="mx" type="hidden" value="0"><input id="my" type="hidden" value="0">
+      <label class="inl">Sensibilitat <input id="sens" type="range" min="1" max="30" value="16" style="width:140px"></label>
+      <label class="inl">Tancar buits <input id="gap" type="range" min="1" max="15" value="5" style="width:120px"></label>
+      <label class="inl">Files <input id="fixRows" type="number" min="0" max="60" placeholder="auto" style="width:68px"></label>
+      <label class="inl">Columnes <input id="fixCols" type="number" min="0" max="60" placeholder="auto" style="width:68px"></label>
+      <label class="inl"><input id="skipEmpty" type="checkbox" checked> Excloure buides · mínim de traç (%) <input id="emptyThr" type="number" min="0" max="20" step="0.1" value="0.3" style="width:64px"></label>
+      <label class="inl">Retall intern (%) <input id="inset" type="number" min="0" max="20" step="1" value="4" style="width:64px"></label>
     </div>
     <div class="row">
-      <button id="btnMarks" class="sec">🎯 Tornar a detectar les marques</button>
-      <button id="zIn" class="sec">＋</button>
+      <button id="rotL" class="sec">⟲ Girar 90°</button>
+      <button id="rotR" class="sec">⟳ Girar 90°</button>
       <button id="zOut" class="sec">－</button>
+      <input id="zSlider" type="range" min="100" max="1600" step="5" value="100" style="width:140px" aria-label="Zoom">
+      <button id="zIn" class="sec">＋</button>
+      <b id="zLabel" style="min-width:3.2em">×1,0</b>
       <button id="zReset" class="sec">Restablir vista</button>
     </div>
-    <p class="status" id="markInfo">La graella es calcula a partir de les 4 marques (cercles blaus). Arrossega una marca per corregir-la; arrossega fora de les marques per desplaçar la vista. Roda del ratolí o pessic per fer zoom.</p>
-    <div class="stage" id="rectStage" style="touch-action:none">
-      <div id="rectInner" style="position:relative;transform-origin:0 0">
-        <canvas id="rectCanvas"></canvas><canvas id="gridOver" class="over"></canvas>
+    <p class="status"><b>Noms:</b> cada imatge porta sempre el nom de la seva posició (A1, A2… B1…), comptant des de dalt a l'esquerra, i mai depèn del contingut. Si vols generar un dataset, fixa les files i columnes: així una casella no detectada no pot desplaçar els noms.</p>
+    <p class="status">Files i columnes (tal com es veuen un cop girada la foto): deixa-ho en blanc perquè es detecti sol, o fixa'ls i l'aplicació provarà sensibilitats fins a trobar exactament aquest nombre de caselles.</p>
+    <p class="status" id="detInfo"></p>
+    <p class="status" id="emptyInfo"></p>
+    <div class="stage" id="stage" style="touch-action:none;cursor:grab">
+      <div id="inner" style="position:relative;transform-origin:0 0">
+        <canvas id="workCanvas"></canvas><canvas id="over" class="over"></canvas>
       </div>
     </div>
-    <p class="status" id="rectInfo"></p>
-    <div class="row">
-      <button id="btnCut">Generar imatges</button>
-    </div>
+    <p class="status">Gira la foto fins que les lletres quedin dretes: la casella de dalt a l'esquerra serà la A1. <b>Fes clic en una casella</b> per excloure-la (vermella) o tornar-la a incloure (verda). Zoom: pessic amb dos dits (o roda del ratolí). Arrossega per desplaçar. Un toc curt a una casella l'exclou o la torna a incloure.</p>
+    <div class="row"><button id="btnCut">Generar imatges</button></div>
   </section>
 
   <section id="secOut" class="hidden">
-    <h2><span>4</span>Resultat</h2>
+    <h2><span>3</span>Resultat</h2>
     <div class="row">
       <button id="btnZip">⬇ Descarregar-ho tot (ZIP)</button>
+      <label class="inl"><input id="folders" type="checkbox" checked> Una carpeta per casella (A1/, A2/…)</label>
       <span id="outInfo" class="status"></span>
     </div>
     <div id="out" class="grid"></div>
@@ -111,18 +115,17 @@
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
-const PPM = 8;                    // píxels per mm al full rectificat (casella 20 mm = 160 px)
-const A5 = { w:148, h:210 };
+const DET_W = 2000;                 // amplada de treball per a la detecció (els paràmetres són relatius a aquesta mida)
 
-let cvReady = false, stream = null, liveTimer = null;
-let still = null;                 // canvas amb la foto capturada
-let corners = null;               // 4 punts [{x,y}] TL,TR,BR,BL en coordenades de 'still'
-let rect = null;                 // canvas del full rectificat
-let results = [];                 // {name, blob, url}
+let cvReady = false, stream = null;
+let photo = null;                   // canvas amb la foto original
+let turns = 0;                      // girs de 90° aplicats
+const work = $('workCanvas');       // foto girada que es mostra i d'on es retalla
+let cells = [], medW = 0, medH = 0, results = [], detTimer = null, matchOK = true;
 
 /* ---------- OpenCV ---------- */
 function onCvLoaded() {
-  const ready = () => { cvReady = true; setStatus('OpenCV llest. Obre la càmera o carrega una imatge.', true); };
+  const ready = () => { cvReady = true; setStatus('OpenCV llest. Obre la càmera o carrega una imatge.', true); if (photo) runDetect(); };
   if (cv.getBuildInformation) ready(); else cv.onRuntimeInitialized = ready;
 }
 function onCvError() { setStatus('No s\'ha pogut carregar OpenCV (cal connexió a internet).'); }
@@ -131,324 +134,332 @@ function setStatus(t, ok) { const s = $('camStatus'); s.textContent = t; s.class
 function orderPoints(pts) {
   const s = pts.map(p => p.x + p.y), d = pts.map(p => p.x - p.y);
   return [pts[s.indexOf(Math.min(...s))], pts[d.indexOf(Math.max(...d))],
-          pts[s.indexOf(Math.max(...s))], pts[d.indexOf(Math.min(...d))]];
+          pts[s.indexOf(Math.max(...s))], pts[d.indexOf(Math.min(...d))]];   // TL, TR, BR, BL
 }
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const median = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+function rowLetter(i) { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
 
-/* Detecta el quadrilàter del paper. Retorna 4 punts (coords de l'origen) o null. */
-function detectPaper(source, sw, sh) {
-  const scale = Math.min(1, 640 / Math.max(sw, sh));
-  const w = Math.round(sw * scale), h = Math.round(sh * scale);
-  const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
-  tmp.getContext('2d').drawImage(source, 0, 0, w, h);
-  const src = cv.imread(tmp), gray = new cv.Mat(), blur = new cv.Mat();
-  const garbage = [src, gray, blur];
-  let best = null;
-  try {
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-    const masks = [];
-    const otsu = new cv.Mat(); cv.threshold(blur, otsu, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU); masks.push(otsu);
-    const otsuI = new cv.Mat(); cv.bitwise_not(otsu, otsuI); masks.push(otsuI);
-    const edges = new cv.Mat(); cv.Canny(blur, edges, 50, 150);
-    const k = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
-    cv.dilate(edges, edges, k); masks.push(edges); garbage.push(k);
-    garbage.push(...masks);
-    const imgArea = w * h;
-    for (const m of masks) {
-      const cnts = new cv.MatVector(), hier = new cv.Mat();
-      cv.findContours(m, cnts, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-      for (let i = 0; i < cnts.size(); i++) {
-        const c = cnts.get(i), area = cv.contourArea(c);
-        if (area > imgArea * 0.15 && area < imgArea * 0.97) {
-          const hull = new cv.Mat(); cv.convexHull(c, hull);
-          const peri = cv.arcLength(hull, true), ap = new cv.Mat();
-          cv.approxPolyDP(hull, ap, 0.03 * peri, true);
-          let pts;
-          if (ap.rows === 4) { pts = []; for (let j = 0; j < 4; j++) pts.push({ x: ap.data32S[j*2], y: ap.data32S[j*2+1] }); }
-          else { const r = cv.minAreaRect(hull); pts = cv.RotatedRect.points(r).map(p => ({ x: p.x, y: p.y })); }
-          hull.delete(); ap.delete();
-          if (!best || area > best.area) best = { area, pts };
-        }
-        c.delete();
-      }
-      cnts.delete(); hier.delete();
-    }
-  } finally { garbage.forEach(m => m.delete()); }
-  if (!best) return null;
-  return orderPoints(best.pts).map(p => ({ x: p.x / scale, y: p.y / scale }));
-}
-
-/* ---------- Càmera ---------- */
+/* ---------- Pas 1: foto ---------- */
 $('btnCam').onclick = async () => {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false });
     const v = $('video'); v.srcObject = stream; await v.play();
     $('btnShot').disabled = false; $('btnCam').textContent = 'Càmera oberta';
-    clearInterval(liveTimer); liveTimer = setInterval(liveDetect, 400);
   } catch (e) { setStatus('No es pot obrir la càmera: ' + e.message); }
 };
-
-function liveDetect() {
-  const v = $('video'), o = $('liveOver');
-  if (!v.videoWidth) return;
-  if (o.width !== v.videoWidth) { o.width = v.videoWidth; o.height = v.videoHeight; }
-  const ctx = o.getContext('2d'); ctx.clearRect(0, 0, o.width, o.height);
-  if (!cvReady) return;
-  let q = null; try { q = detectPaper(v, v.videoWidth, v.videoHeight); } catch (e) {}
-  if (q) { drawQuad(ctx, q, '#22c55e', Math.max(3, o.width / 300)); }
-}
-
-function drawQuad(ctx, q, color, lw) {
-  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
-  q.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.stroke();
-}
-
 $('btnShot').onclick = () => {
-  const v = $('video');
-  still = document.createElement('canvas'); still.width = v.videoWidth; still.height = v.videoHeight;
-  still.getContext('2d').drawImage(v, 0, 0);
-  startFix();
+  const v = $('video'), c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+  loadPhoto(c);
 };
-
-$('file').onchange = e => {
+const onFile = e => {
   const f = e.target.files[0]; if (!f) return;
   const img = new Image();
   img.onload = () => {
-    const sc = Math.min(1, 2400 / Math.max(img.width, img.height));
-    still = document.createElement('canvas'); still.width = Math.round(img.width * sc); still.height = Math.round(img.height * sc);
-    still.getContext('2d').drawImage(img, 0, 0, still.width, still.height);
-    URL.revokeObjectURL(img.src); startFix();
+    const sc = Math.min(1, 4000 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+    c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(img.src); loadPhoto(c);
   };
   img.src = URL.createObjectURL(f); e.target.value = '';
 };
+$('file').onchange = onFile; $('fileCam').onchange = onFile;
 
-/* ---------- Pas 2: ajust de vores ---------- */
-function autoCorners() {
-  const w = still.width, h = still.height;
-  let q = null;
-  if (cvReady) { try { q = detectPaper(still, w, h); } catch (e) { console.error(e); } }
-  corners = q || [{ x: w*.1, y: h*.1 }, { x: w*.9, y: h*.1 }, { x: w*.9, y: h*.9 }, { x: w*.1, y: h*.9 }];
-  return !!q;
+function loadPhoto(c) {
+  photo = c; turns = 0;
+  $('secDet').classList.remove('hidden');
+  makeWork(); resetView(); runDetect();
+  $('secDet').scrollIntoView({ behavior: 'smooth' });
 }
-function startFix() {
-  const ok = autoCorners();
-  $('secFix').classList.remove('hidden');
-  setStatus(ok ? 'Paper detectat. Revisa les vores.' : 'No s\'ha detectat el paper; col·loca les puntes manualment.', ok);
-  drawFix();
-  $('secFix').scrollIntoView({ behavior: 'smooth' });
+function makeWork() {
+  const pw = photo.width, ph = photo.height, odd = turns % 2 === 1;
+  work.width = odd ? ph : pw; work.height = odd ? pw : ph;
+  const ctx = work.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.translate(work.width / 2, work.height / 2); ctx.rotate(turns * Math.PI / 2);
+  ctx.drawImage(photo, -pw / 2, -ph / 2); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  fitStage();
 }
-$('btnRedetect').onclick = () => { autoCorners(); drawFix(); };
+$('rotL').onclick = () => { turns = (turns + 3) % 4; makeWork(); resetView(); runDetect(); };
+$('rotR').onclick = () => { turns = (turns + 1) % 4; makeWork(); resetView(); runDetect(); };
 
-function drawFix() {
-  const c = $('fixCanvas'); c.width = still.width; c.height = still.height;
-  const ctx = c.getContext('2d'); ctx.drawImage(still, 0, 0);
-  const lw = Math.max(3, c.width / 300);
-  drawQuad(ctx, corners, '#22c55e', lw);
-  ctx.fillStyle = '#ef4444';
-  corners.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, lw * 3.5, 0, 7); ctx.fill(); });
+/* ---------- Pas 2: detecció de caselles ---------- */
+/* Cada casella és un forat tancat entre les línies de la graella. Les lletres són illes dins del forat i no el modifiquen. */
+/* Una passada de detecció amb uns paràmetres concrets. */
+function detectOnce(small, C, g) {
+  const src = cv.imread(small), gray = new cv.Mat(), bin = new cv.Mat();
+  const ker = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(g, g));
+  const cnts = new cv.MatVector(), hier = new cv.Mat();
+  const cand = [], minA = Math.pow(small.width * 0.02, 2);
+  try {
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    cv.GaussianBlur(gray, gray, new cv.Size(3, 3), 0);
+    cv.adaptiveThreshold(gray, bin, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 51, C);
+    cv.dilate(bin, bin, ker);                                    // tanca petits buits a les línies
+    cv.findContours(bin, cnts, hier, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+    for (let i = 0; i < cnts.size(); i++) {
+      if (hier.data32S[i * 4 + 3] < 0) continue;                 // només forats (interior de les caselles)
+      const c = cnts.get(i);
+      if (cv.contourArea(c) >= minA) {
+        const hull = new cv.Mat(); cv.convexHull(c, hull);       // el casc recupera la casella si una lletra toca la vora
+        const r = cv.minAreaRect(hull), hullArea = cv.contourArea(hull);
+        const p = orderPoints(cv.RotatedRect.points(r).map(q => ({ x: q.x, y: q.y })));
+        const w = dist(p[0], p[1]), h = dist(p[0], p[3]);
+        if (w > 0 && h > 0 && hullArea / (w * h) > 0.8) cand.push({ p, w, h, cx: r.center.x, cy: r.center.y });
+        hull.delete();
+      }
+      c.delete();
+    }
+  } finally { [src, gray, bin, ker, cnts, hier].forEach(m => m.delete()); }
+  if (!cand.length) return { ok: [], cand, rows: 0, cols: 0, mW: 0, mH: 0 };
+  const mW = median(cand.map(c => c.w)), mH = median(cand.map(c => c.h));
+  const sized = cand.filter(c => Math.abs(c.w - mW) < 0.3 * mW && Math.abs(c.h - mH) < 0.3 * mH);
+  const lat = assignLattice(sized);
+  return { ok: lat.cells, cand, mW, mH, rows: lat.rows, cols: lat.cols };
 }
 
-let drag = -1;
-const fixC = $('fixCanvas');
-function evPt(e) {
-  const r = fixC.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * fixC.width / r.width, y: (e.clientY - r.top) * fixC.height / r.height };
+/* Assigna fila i columna a cada casella seguint la graella casella a casella (BFS des del centre).
+   Cada casella busca les veïnes amb els seus propis vectors d'amplada i alçada, així tolera perspectiva,
+   inclinació i caselles que falten. Els noms (A1, B3…) només depenen d'aquesta posició. */
+function assignLattice(cs) {
+  if (!cs.length) return { cells: [], rows: 0, cols: 0 };
+  cs.forEach(c => {
+    const p = c.p;
+    c.a = { x: (p[1].x - p[0].x + p[2].x - p[3].x) / 2, y: (p[1].y - p[0].y + p[2].y - p[3].y) / 2 };   // sentit "dreta"
+    c.b = { x: (p[3].x - p[0].x + p[2].x - p[1].x) / 2, y: (p[3].y - p[0].y + p[2].y - p[1].y) / 2 };   // sentit "avall"
+    c.q = null; c.r = null;
+  });
+  const find = (c, dr, dq) => {
+    const w = Math.hypot(c.a.x, c.a.y), h = Math.hypot(c.b.x, c.b.y);
+    const ax = c.a.x / w, ay = c.a.y / w, bx = c.b.x / h, by = c.b.y / h;
+    let best = null, bd = 0.4 * Math.min(w, h);
+    for (const o of cs) {
+      if (o.q !== null) continue;
+      const dx = o.cx - c.cx, dy = o.cy - c.cy;
+      const d = Math.hypot(dx * ax + dy * ay - dq * w * 1.08, dx * bx + dy * by - dr * h * 1.08);   // 1,08: gruix de la línia entre caselles
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
+  };
+  const mx = cs.reduce((s, c) => s + c.cx, 0) / cs.length, my = cs.reduce((s, c) => s + c.cy, 0) / cs.length;
+  const start = cs.reduce((b, c) => Math.hypot(c.cx - mx, c.cy - my) < Math.hypot(b.cx - mx, b.cy - my) ? c : b);
+  start.q = 0; start.r = 0;
+  const used = new Set(['0,0']), queue = [start], got = [start];
+  while (queue.length) {
+    const c = queue.shift();
+    for (const [dr, dq] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const o = find(c, dr, dq); if (!o) continue;
+      const r = c.r + dr, q = c.q + dq, key = r + ',' + q;
+      if (used.has(key)) continue;
+      used.add(key); o.r = r; o.q = q; queue.push(o); got.push(o);
+    }
+  }
+  const mr = Math.min(...got.map(c => c.r)), mq = Math.min(...got.map(c => c.q));
+  got.forEach(c => { c.row = c.r - mr; c.col = c.q - mq; });
+  return { cells: got, rows: Math.max(...got.map(c => c.row)) + 1, cols: Math.max(...got.map(c => c.col)) + 1 };
 }
-fixC.addEventListener('pointerdown', e => {
-  const p = evPt(e); let bi = -1, bd = Infinity;
-  corners.forEach((c, i) => { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bd) { bd = d; bi = i; } });
-  if (bd < fixC.width * 0.08) { drag = bi; fixC.setPointerCapture(e.pointerId); }
-});
-fixC.addEventListener('pointermove', e => { if (drag < 0) return; corners[drag] = evPt(e); drawFix(); });
-fixC.addEventListener('pointerup', () => drag = -1);
 
-/* ---------- Pas 3: rectificació i graella ---------- */
-$('btnRect').onclick = () => {
-  if (!cvReady) return;
-  const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  const wAvg = (d(corners[0], corners[1]) + d(corners[3], corners[2])) / 2;
-  const hAvg = (d(corners[0], corners[3]) + d(corners[1], corners[2])) / 2;
-  const landscape = wAvg > hAvg;
-  const wmm = landscape ? A5.h : A5.w, hmm = landscape ? A5.w : A5.h;
-  const W = wmm * PPM, H = hmm * PPM;
-  const src = cv.imread(still), dst = new cv.Mat();
-  const a = cv.matFromArray(4, 1, cv.CV_32FC2, corners.flatMap(p => [p.x, p.y]));
-  const b = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, W, 0, W, H, 0, H]);
-  const M = cv.getPerspectiveTransform(a, b);
-  cv.warpPerspective(src, dst, M, new cv.Size(W, H), cv.INTER_CUBIC, cv.BORDER_CONSTANT, new cv.Scalar());
-  rect = $('rectCanvas'); rect.width = W; rect.height = H; cv.imshow(rect, dst);
-  [src, dst, a, b, M].forEach(m => m.delete());
-  rect.dataset.wmm = wmm; rect.dataset.hmm = hmm;
-  $('secGrid').classList.remove('hidden');
-  $('rectInfo').textContent = `Full rectificat: ${wmm}×${hmm} mm (${landscape ? 'horitzontal' : 'vertical'}).`;
-  view.z = 1; view.tx = view.ty = 0; inner.style.transform = '';
-  runDetectMarks();
-  $('secGrid').scrollIntoView({ behavior: 'smooth' });
-};
+/* Percentatge de píxels amb traç dins de cada casella (sense les vores). Black-hat: només detecta traços
+   prims (lletres), per això les ombres i els degradats d'il·luminació no compten com a contingut. */
+function computeInk(small, list) {
+  const src = cv.imread(small), gray = new cv.Mat(), bl = new cv.Mat(), diff = new cv.Mat(), sm = new cv.Mat();
+  const closed = new cv.Mat(), bhat = new cv.Mat(), thr = new cv.Mat(), m1 = new cv.Mat(), m2 = new cv.Mat(), bh = new cv.Mat();
+  const ker = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(15, 15));
+  try {
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    // soroll de la imatge (MAD de la diferència amb la versió suavitzada) i suavitzat previ
+    cv.GaussianBlur(gray, bl, new cv.Size(5, 5), 0); cv.absdiff(gray, bl, diff);
+    const hist = new Array(256).fill(0); for (const v of diff.data) hist[v]++;
+    let acc = 0, med = 0; const half = diff.data.length / 2; for (; med < 256 && (acc += hist[med]) < half; med++);
+    const noise = 1.4826 * med;
+    cv.GaussianBlur(gray, sm, new cv.Size(5, 5), 1.2);
+    // Black-hat relatiu: un píxel és traç si és prou més fosc (un 15 %) que el paper del seu voltant i
+    // supera el soroll. Així no depèn de la llum: ni de la intensitat ni dels degradats.
+    cv.morphologyEx(sm, closed, cv.MORPH_CLOSE, ker);
+    cv.subtract(closed, sm, bhat);
+    closed.convertTo(thr, cv.CV_8U, 0.15);
+    cv.compare(bhat, thr, m1, cv.CMP_GT);
+    cv.threshold(bhat, m2, Math.max(8, 3 * noise), 255, cv.THRESH_BINARY);
+    cv.bitwise_and(m1, m2, bh);
+    for (const c of list) {
+      const cx = c.p.reduce((t, q) => t + q.x, 0) / 4, cy = c.p.reduce((t, q) => t + q.y, 0) / 4;
+      const pts = c.p.map(q => ({ x: cx + (q.x - cx) * 0.74, y: cy + (q.y - cy) * 0.74 }));   // interior: sense les línies
+      const x0 = Math.max(0, Math.floor(Math.min(...pts.map(q => q.x)))), y0 = Math.max(0, Math.floor(Math.min(...pts.map(q => q.y))));
+      const x1 = Math.min(bh.cols, Math.ceil(Math.max(...pts.map(q => q.x)))), y1 = Math.min(bh.rows, Math.ceil(Math.max(...pts.map(q => q.y))));
+      if (x1 <= x0 || y1 <= y0) { c.ink = 0; continue; }
+      const roi = bh.roi(new cv.Rect(x0, y0, x1 - x0, y1 - y0));
+      const mask = cv.Mat.zeros(roi.rows, roi.cols, cv.CV_8UC1), res = new cv.Mat();
+      const poly = cv.matFromArray(4, 1, cv.CV_32SC2, pts.flatMap(q => [Math.round(q.x - x0), Math.round(q.y - y0)]));
+      cv.fillConvexPoly(mask, poly, new cv.Scalar(255));
+      cv.bitwise_and(roi, mask, res);
+      const tot = cv.countNonZero(mask);
+      c.ink = tot ? 100 * cv.countNonZero(res) / tot : 0;
+      [roi, mask, res, poly].forEach(m => m.delete());
+    }
+  } finally { [src, gray, bl, diff, sm, closed, bhat, thr, m1, m2, bh, ker].forEach(m => m.delete()); }
+}
+/* Marca com a buides (i exclou) les caselles sense traç, respectant les que l'usuari ha tocat a mà. */
+function classifyEmpty() {
+  const thr = Math.max(0, +$('emptyThr').value), skip = $('skipEmpty').checked;
+  cells.forEach(c => { c.empty = skip && c.ink < thr; if (!c.manual) c.on = !c.empty; });
+  const on = cells.filter(c => c.on).length, emp = cells.filter(c => c.empty).length;
+  $('emptyInfo').textContent = cells.length ? `${on} caselles amb contingut · ${emp} buides (vermelles, no es generen).` : '';
+  drawOverlay();
+}
+['skipEmpty', 'emptyThr'].forEach(id => $(id).oninput = classifyEmpty);
 
-/* La posició de les 4 marques (mm sobre el full) defineix la graella. */
-let marks = null;                       // [TL, TR, BL, BR]
-function defaultMarks() {
-  const wmm = +rect.dataset.wmm, hmm = +rect.dataset.hmm, g = gridParams(), off = +$('markOff').value;
-  const gw = g.cols * 20, gh = g.rows * 20, x0 = (wmm - gw) / 2, y0 = (hmm - gh) / 2;
-  return [{ x: x0 - off, y: y0 - off }, { x: x0 + gw + off, y: y0 - off }, { x: x0 - off, y: y0 + gh + off }, { x: x0 + gw + off, y: y0 + gh + off }];
-}
-function updateFromMarks() {
-  if (!rect || !marks) return;
-  const off = +$('markOff').value, g = gridParams(), [tl, tr, bl, br] = marks;
-  const x0 = (tl.x + bl.x) / 2 + off, x1 = (tr.x + br.x) / 2 - off;
-  const y0 = (tl.y + tr.y) / 2 + off, y1 = (bl.y + br.y) / 2 - off;
-  const cw = (x1 - x0) / g.cols, ch = (y1 - y0) / g.rows;
-  $('cell').value = ((cw + ch) / 2).toFixed(2);
-  $('mx').value = x0.toFixed(2); $('my').value = y0.toFixed(2);
-  drawGrid();
-  return { cw, ch };
-}
-['cols', 'rows', 'markOff', 'inset'].forEach(id => $(id).oninput = () => updateFromMarks());
+function runDetect() {
+  if (!cvReady || !photo) return;
+  const info = $('detInfo');
+  const sc = Math.min(1, DET_W / work.width);
+  const small = document.createElement('canvas');
+  small.width = Math.round(work.width * sc); small.height = Math.round(work.height * sc);
+  small.getContext('2d').drawImage(work, 0, 0, small.width, small.height);
 
-function gridParams() {
-  return { cols: +$('cols').value, rows: +$('rows').value, cell: +$('cell').value,
-           mx: +$('mx').value, my: +$('my').value, inset: +$('inset').value };
+  const R = Math.max(0, +$('fixRows').value | 0), Cn = Math.max(0, +$('fixCols').value | 0), fixed = R > 0 && Cn > 0;
+  const tries = [[31 - +$('sens').value, Math.max(1, +$('gap').value)]];
+  if (fixed) for (const C of [15, 8, 25, 5, 30]) for (const g of [5, 3, 7, 9]) tries.push([C, g]);
+  let best = null;
+  for (const [C, g] of tries) {                                  // amb files/columnes fixades, busca uns paràmetres que hi encaixin
+    const res = detectOnce(small, C, g);
+    res.C = C; res.g = g;
+    res.score = fixed ? Math.abs(res.ok.length - R * Cn) + Math.abs(res.rows - R) + Math.abs(res.cols - Cn) : 0;
+    if (!best || res.score < best.score) best = res;
+    if (res.score === 0) break;
+  }
+  if (fixed && (best.C !== tries[0][0] || best.g !== tries[0][1])) { $('sens').value = 31 - best.C; $('gap').value = best.g; }
+
+  const ok = best.ok;
+  if (ok.length) computeInk(small, ok);
+  matchOK = !fixed || best.score === 0;       // amb files/columnes fixades, només es genera si el recompte quadra
+  if (!ok.length) { cells = []; info.textContent = 'No s\'ha detectat cap casella. Prova de pujar la sensibilitat o de tancar més buits.'; info.className = 'status'; $('emptyInfo').textContent = ''; drawOverlay(); return; }
+  ok.sort((a, b) => a.row - b.row || a.col - b.col);
+  const inv = 1 / sc;
+  cells = ok.map(c => ({ p: c.p.map(q => ({ x: q.x * inv, y: q.y * inv })), row: c.row, col: c.col, on: true, manual: false, empty: false, ink: c.ink, name: rowLetter(c.row) + (c.col + 1) }));
+  medW = best.mW * inv; medH = best.mH * inv;
+  const found = `${cells.length} caselles · ${best.rows} files × ${best.cols} columnes`;
+  if (fixed && best.score !== 0) { info.textContent = `⚠ S'esperaven ${R}×${Cn} = ${R * Cn} caselles i se n'han trobat ${found}. Revisa la foto o ajusta la sensibilitat.`; info.className = 'status'; }
+  else { info.textContent = (fixed ? '✓ ' : '') + found + (best.cand.length > ok.length ? ` (${best.cand.length - ok.length} formes descartades per mida)` : '') + '.'; info.className = 'status ok'; }
+  classifyEmpty();
 }
-function drawGrid() {
-  if (!rect) return;
-  const o = $('gridOver'); o.width = rect.width; o.height = rect.height;
-  const ctx = o.getContext('2d'), g = gridParams();
+['sens', 'gap', 'fixRows', 'fixCols'].forEach(id => $(id).oninput = () => { clearTimeout(detTimer); detTimer = setTimeout(runDetect, 200); });
+
+function drawOverlay() {
+  const o = $('over'); o.width = work.width; o.height = work.height;
+  const ctx = o.getContext('2d'), px = (work.width / stage.clientWidth) / view.z;   // 1 píxel de pantalla en unitats de la imatge
   ctx.clearRect(0, 0, o.width, o.height);
-  ctx.strokeStyle = 'rgba(239,68,68,.9)'; ctx.lineWidth = Math.max(0.6, 2 / view.z); ctx.fillStyle = 'rgba(239,68,68,.9)';
-  ctx.font = `${PPM * 4}px sans-serif`;
-  for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
-    const x = (g.mx + c * g.cell) * PPM, y = (g.my + r * g.cell) * PPM, s = g.cell * PPM;
-    ctx.strokeRect(x, y, s, s);
-    if (c === 0) ctx.fillText(rowLetter(r), x + 4, y + PPM * 5);
-  }
-  if (marks) {                                   // nanses de les marques
-    const rad = 14 * (rect.width / stage.clientWidth) / view.z;   // 14 px de pantalla
-    ctx.strokeStyle = '#2563eb'; ctx.lineWidth = Math.max(1, 3 / view.z * (rect.width / stage.clientWidth));
-    marks.forEach(m => {
-      const x = m.x * PPM, y = m.y * PPM;
-      ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.moveTo(x - rad * 1.5, y); ctx.lineTo(x + rad * 1.5, y);
-      ctx.moveTo(x, y - rad * 1.5); ctx.lineTo(x, y + rad * 1.5); ctx.stroke();
-    });
-  }
+  ctx.lineWidth = 2 * px; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `bold ${Math.max(10 * px, Math.min(medH * 0.28, 40 * px))}px sans-serif`;
+  cells.forEach(c => {
+    ctx.beginPath(); c.p.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath();
+    ctx.fillStyle = c.on ? 'rgba(34,197,94,.14)' : 'rgba(239,68,68,.35)';
+    ctx.strokeStyle = c.on ? '#16a34a' : '#ef4444';
+    ctx.fill(); ctx.stroke();
+    const cx = c.p.reduce((s, q) => s + q.x, 0) / 4, cy = c.p.reduce((s, q) => s + q.y, 0) / 4;
+    ctx.fillStyle = c.on ? '#15803d' : '#b91c1c'; ctx.fillText(c.name, cx, cy);
+  });
 }
-/* ---------- Zoom i desplaçament de la vista ---------- */
-const view = { z: 1, tx: 0, ty: 0 };
-const stage = $('rectStage'), inner = $('rectInner');
 
+/* ---------- Vista: zoom, desplaçament i clic per incloure/excloure ---------- */
+const stage = $('stage'), inner = $('inner'), view = { z: 1, tx: 0, ty: 0 };
+function fitStage() {
+  if (!work.width) return;
+  const maxH = Math.max(320, window.innerHeight * 0.8), avail = stage.parentElement.clientWidth - 32;
+  stage.style.maxWidth = Math.min(avail, maxH * work.width / work.height) + 'px';
+}
 function applyView() {
   const w = stage.clientWidth, h = inner.offsetHeight;
-  view.z = Math.min(10, Math.max(1, view.z));
+  view.z = Math.min(16, Math.max(1, view.z));
   view.tx = Math.min(0, Math.max(w * (1 - view.z), view.tx));
   view.ty = Math.min(0, Math.max(h * (1 - view.z), view.ty));
   inner.style.transform = `translate(${view.tx}px,${view.ty}px) scale(${view.z})`;
-  drawGrid();
+  $('zSlider').value = Math.round(view.z * 100); $('zLabel').textContent = '×' + view.z.toFixed(1).replace('.', ',');
+  drawOverlay();
 }
+function resetView() { view.z = 1; view.tx = view.ty = 0; inner.style.transform = ''; $('zSlider').value = 100; $('zLabel').textContent = '×1,0'; }
 function zoomAt(f, px, py) {
-  const nz = Math.min(10, Math.max(1, view.z * f)), r = nz / view.z;
+  const nz = Math.min(16, Math.max(1, view.z * f)), r = nz / view.z;
   view.tx = px - (px - view.tx) * r; view.ty = py - (py - view.ty) * r; view.z = nz; applyView();
 }
-$('zIn').onclick = () => zoomAt(1.4, stage.clientWidth / 2, inner.offsetHeight / 2);
-$('zOut').onclick = () => zoomAt(1 / 1.4, stage.clientWidth / 2, inner.offsetHeight / 2);
-$('zReset').onclick = () => { view.z = 1; view.tx = view.ty = 0; applyView(); };
-stage.style.cursor = 'grab';
-
+const cx0 = () => stage.clientWidth / 2, cy0 = () => inner.offsetHeight / 2;
+$('zIn').onclick = () => zoomAt(1.15, cx0(), cy0());
+$('zOut').onclick = () => zoomAt(1 / 1.15, cx0(), cy0());
+$('zSlider').oninput = e => zoomAt(e.target.value / 100 / view.z, cx0(), cy0());
+$('zReset').onclick = () => { resetView(); applyView(); };
 stage.addEventListener('wheel', e => {
-  e.preventDefault();
-  const r = stage.getBoundingClientRect();
-  zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left, e.clientY - r.top);
+  e.preventDefault(); const r = stage.getBoundingClientRect();
+  zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - r.left, e.clientY - r.top);
 }, { passive: false });
 
 const ptrs = new Map(); let lastDist = 0;
-function mmAt(e) {                               // client → mm sobre el full
-  const r = stage.getBoundingClientRect(), k = rect.width / PPM / stage.clientWidth / view.z;
-  return { x: (e.clientX - r.left - view.tx) * k, y: (e.clientY - r.top - view.ty) * k, k };
-}
 stage.addEventListener('pointerdown', e => {
   stage.setPointerCapture(e.pointerId);
-  const p = { x: e.clientX, y: e.clientY, mark: -1 };
-  if (marks && ptrs.size === 0) {                // toca una marca?
-    const m = mmAt(e); let bd = Infinity;
-    marks.forEach((q, i) => { const d = Math.hypot(q.x - m.x, q.y - m.y); if (d < bd) { bd = d; p.mark = i; } });
-    if (bd > 20 * m.k) p.mark = -1;              // radi de captura: 20 px de pantalla
-  }
-  ptrs.set(e.pointerId, p); lastDist = 0;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false });
+  lastDist = 0;
 });
 stage.addEventListener('pointermove', e => {
   const p = ptrs.get(e.pointerId); if (!p) return;
-  const dx = e.clientX - p.x, dy = e.clientY - p.y;
-  if (ptrs.size === 2) {                         // pessic: zoom
+  if (ptrs.size >= 2) {                                          // pessic: zoom al voltant del punt mig dels dos dits
     p.x = e.clientX; p.y = e.clientY;
+    ptrs.forEach(q => q.moved = true);
     const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
     if (lastDist) { const r = stage.getBoundingClientRect(); zoomAt(d / lastDist, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top); }
     lastDist = d; return;
   }
+  if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) p.moved = true;     // 8 px: tolera el tremolor del dit
+  if (p.moved) { view.tx += e.clientX - p.x; view.ty += e.clientY - p.y; applyView(); }
   p.x = e.clientX; p.y = e.clientY;
-  if (p.mark >= 0) {                             // arrossega una marca
-    const m = mmAt(e); marks[p.mark] = { x: m.x, y: m.y }; updateFromMarks();
-  } else { view.tx += dx; view.ty += dy; applyView(); }
 });
-['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, e => { ptrs.delete(e.pointerId); lastDist = 0; }));
-window.addEventListener('resize', () => { if (rect) applyView(); });
-
-function rowLetter(i) { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
-
-/* ---------- Marques de calibratge ---------- */
-$('btnMarks').onclick = () => runDetectMarks();
-function runDetectMarks() {
-  const info = $('markInfo');
-  if (!rect || !cvReady) return;
-  const W = rect.width, H = rect.height;
-  const src = cv.imread(rect), gray = new cv.Mat(), bin = new cv.Mat();
-  const cnts = new cv.MatVector(), hier = new cv.Mat();
-  const found = [null, null, null, null]; // TL, TR, BL, BR
-  const dist = [Infinity, Infinity, Infinity, Infinity];
-  try {
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    cv.GaussianBlur(gray, gray, new cv.Size(3, 3), 0);
-    cv.threshold(gray, bin, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-    cv.findContours(bin, cnts, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-    for (let i = 0; i < cnts.size(); i++) {
-      const c = cnts.get(i), r = cv.boundingRect(c), area = cv.contourArea(c);
-      const wmm = r.width / PPM, hmm = r.height / PPM;
-      if (wmm >= 2 && wmm <= 8 && hmm >= 2 && hmm <= 8 && r.width / r.height > .7 && r.width / r.height < 1.4 && area / (r.width * r.height) > .75) {
-        const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-        const q = (cy < H / 2 ? 0 : 2) + (cx < W / 2 ? 0 : 1);
-        const d = Math.hypot(cx - (q & 1 ? W : 0), cy - (q & 2 ? H : 0));
-        if (d < dist[q]) { dist[q] = d; found[q] = { x: cx / PPM, y: cy / PPM }; }
-      }
-      c.delete();
-    }
-  } finally { [src, gray, bin, cnts, hier].forEach(m => m.delete()); }
-  if (found.some(f => !f)) {
-    marks = defaultMarks(); updateFromMarks();
-    info.textContent = `Només s'han trobat ${found.filter(Boolean).length} de 4 marques. He posat les marques en una posició aproximada: arrossega cada cercle blau al seu quadrat negre.`;
-    info.className = 'status'; return;
-  }
-  marks = found;
-  const { cw, ch } = updateFromMarks();
-  info.textContent = `Marques detectades. Casella ${cw.toFixed(2)}×${ch.toFixed(2)} mm` + (Math.abs(cw - ch) > .6 ? ' ⚠ difereix entre amplada i alçada: revisa columnes/files.' : '. Pots afinar-les arrossegant els cercles blaus.');
-  info.className = 'status ok';
+const endPtr = e => {
+  const p = ptrs.get(e.pointerId);
+  if (p && !p.moved && ptrs.size === 1 && e.type === 'pointerup') toggleAt(e);   // toc curt = incloure/excloure
+  ptrs.delete(e.pointerId); lastDist = 0;
+};
+stage.addEventListener('pointerup', endPtr);
+stage.addEventListener('pointercancel', endPtr);
+function inQuad(q, x, y) {
+  let ins = false;
+  for (let i = 0, j = 3; i < 4; j = i++)
+    if ((q[i].y > y) !== (q[j].y > y) && x < (q[j].x - q[i].x) * (y - q[i].y) / (q[j].y - q[i].y) + q[i].x) ins = !ins;
+  return ins;
 }
+function toggleAt(e) {
+  const r = stage.getBoundingClientRect(), k = work.width / stage.clientWidth / view.z;
+  const x = (e.clientX - r.left - view.tx) * k, y = (e.clientY - r.top - view.ty) * k;
+  const c = cells.find(c => inQuad(c.p, x, y)); if (!c) return;
+  c.on = !c.on; c.manual = true; drawOverlay();
+  $('emptyInfo').textContent = `${cells.filter(c => c.on).length} de ${cells.length} caselles seleccionades.`;
+}
+window.addEventListener('resize', () => { if (photo) { fitStage(); applyView(); } });
 
-/* ---------- Pas 4: retall i descàrrega ---------- */
+/* ---------- Pas 3: retall i descàrrega ---------- */
 const rnd = () => String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
 
 $('btnCut').onclick = async () => {
-  const g = gridParams(), ins = g.inset * PPM, s = g.cell * PPM - 2 * ins;
+  const sel = cells.filter(c => c.on); if (!sel.length || !cvReady) return;
+  if (!matchOK) {                            // evita noms incorrectes (p. ex. una casella de la vora sense detectar desplaça tots els noms)
+    $('detInfo').textContent = '⚠ El nombre de caselles detectades no coincideix amb les files × columnes fixades. No es genera res per no barrejar els noms (A1, A2…). Ajusta la foto o la sensibilitat fins que surti ✓.';
+    $('detInfo').className = 'status'; return;
+  }
   results.forEach(r => URL.revokeObjectURL(r.url)); results = [];
   const out = $('out'); out.innerHTML = '';
-  const used = new Set();
-  for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
-    const x = (g.mx + c * g.cell) * PPM + ins, y = (g.my + r * g.cell) * PPM + ins;
-    if (x < 0 || y < 0 || x + s > rect.width + 1 || y + s > rect.height + 1) continue; // fora del full
-    const cv2 = document.createElement('canvas'); cv2.width = cv2.height = Math.round(s);
-    cv2.getContext('2d').drawImage(rect, x, y, s, s, 0, 0, cv2.width, cv2.height);
-    const blob = await new Promise(res => cv2.toBlob(res, 'image/png'));
-    let n; do { n = rnd(); } while (used.has(n)); used.add(n);
-    const name = `${rowLetter(r)}${c + 1}_${n}.png`;
-    results.push({ name, blob, url: URL.createObjectURL(blob) });
-  }
+  const ins = Math.max(0, +$('inset').value) / 100, k = 1 - 2 * ins;
+  const Wo = Math.max(8, Math.round(medW * k)), Ho = Math.max(8, Math.round(medH * k));   // mateixa mida per a totes
+  const src = cv.imread(work), used = new Set();
+  const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, Wo, 0, Wo, Ho, 0, Ho]);
+  try {
+    for (const c of sel) {
+      const cx = c.p.reduce((s, q) => s + q.x, 0) / 4, cy = c.p.reduce((s, q) => s + q.y, 0) / 4;
+      const pts = c.p.flatMap(q => [cx + (q.x - cx) * k, cy + (q.y - cy) * k]);   // redueix cap al centre = retall intern
+      const a = cv.matFromArray(4, 1, cv.CV_32FC2, pts), M = cv.getPerspectiveTransform(a, dstTri), dst = new cv.Mat();
+      cv.warpPerspective(src, dst, M, new cv.Size(Wo, Ho), cv.INTER_CUBIC, cv.BORDER_REPLICATE, new cv.Scalar());
+      const cvs = document.createElement('canvas'); cv.imshow(cvs, dst);
+      [a, M, dst].forEach(m => m.delete());
+      const blob = await new Promise(res => cvs.toBlob(res, 'image/png'));
+      let n; do { n = rnd(); } while (used.has(n)); used.add(n);
+      results.push({ cell: c.name, name: `${c.name}_${n}.png`, blob, url: URL.createObjectURL(blob) });
+    }
+  } finally { src.delete(); dstTri.delete(); }
   for (const r of results) {
     const d = document.createElement('div'); d.className = 'cell';
     d.innerHTML = `<img src="${r.url}" alt="${r.name}"><a href="${r.url}" download="${r.name}">${r.name}</a>`;
@@ -460,8 +471,8 @@ $('btnCut').onclick = async () => {
 
 $('btnZip').onclick = async () => {
   if (!results.length) return;
-  const zip = new JSZip();
-  results.forEach(r => zip.file(r.name, r.blob));
+  const zip = new JSZip(); const dirs = $('folders').checked;
+  results.forEach(r => zip.file(dirs ? `${r.cell}/${r.name}` : r.name, r.blob));
   const blob = await zip.generateAsync({ type: 'blob' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'caselles_' + rnd() + '.zip'; a.click();
