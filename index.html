@@ -96,21 +96,20 @@
       </div>
     </div>
     <p class="status">Gira la foto fins que les lletres quedin dretes: la casella de dalt a l'esquerra serà la A1. <b>Fes clic en una casella</b> per excloure-la (vermella) o tornar-la a incloure (verda). Zoom: pessic amb dos dits (o roda del ratolí). Arrossega per desplaçar. Un toc curt a una casella l'exclou o la torna a incloure.</p>
-    <div class="row"><button id="btnCut">Generar imatges</button></div>
+    <div class="row"><button id="btnCut">☁ Enviar imatges</button></div>
   </section>
 
   <section id="secOut" class="hidden">
-    <h2><span>3</span>Resultat</h2>
+    <h2><span>3</span>Enviament</h2>
     <div class="row">
-      <button id="btnZip">⬇ Descarregar-ho tot (ZIP)</button>
-      <label class="inl"><input id="folders" type="checkbox" checked> Una carpeta per casella (A1/, A2/…)</label>
-      <span id="outInfo" class="status"></span>
+      <span id="upInfo" class="status"></span>
+      <button id="btnUp" class="hidden">Reintentar l'enviament</button>
     </div>
     <div id="out" class="grid"></div>
   </section>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="config.js"></script>
 <script async src="https://docs.opencv.org/4.9.0/opencv.js" onload="onCvLoaded()" onerror="onCvError()"></script>
 <script>
 'use strict';
@@ -437,6 +436,9 @@ const rnd = () => String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
 
 $('btnCut').onclick = async () => {
   const sel = cells.filter(c => c.on); if (!sel.length || !cvReady) return;
+  if (!upReady) {
+    $('detInfo').textContent = "⚠ L'enviament no està configurat (falta la URL i la clau a config.js)."; $('detInfo').className = 'status'; return;
+  }
   if (!matchOK) {                            // evita noms incorrectes (p. ex. una casella de la vora sense detectar desplaça tots els noms)
     $('detInfo').textContent = '⚠ El nombre de caselles detectades no coincideix amb les files × columnes fixades. No es genera res per no barrejar els noms (A1, A2…). Ajusta la foto o la sensibilitat fins que surti ✓.';
     $('detInfo').className = 'status'; return;
@@ -462,22 +464,49 @@ $('btnCut').onclick = async () => {
   } finally { src.delete(); dstTri.delete(); }
   for (const r of results) {
     const d = document.createElement('div'); d.className = 'cell';
-    d.innerHTML = `<img src="${r.url}" alt="${r.name}"><a href="${r.url}" download="${r.name}">${r.name}</a>`;
+    d.innerHTML = `<img src="${r.url}" alt="${r.cell}"><span>${r.cell}</span>`;
     out.appendChild(d);
   }
-  $('outInfo').textContent = `${results.length} imatges generades`;
   $('secOut').classList.remove('hidden'); $('secOut').scrollIntoView({ behavior: 'smooth' });
+  await uploadAll();
 };
 
-$('btnZip').onclick = async () => {
-  if (!results.length) return;
-  const zip = new JSZip(); const dirs = $('folders').checked;
-  results.forEach(r => zip.file(dirs ? `${r.cell}/${r.name}` : r.name, r.blob));
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'caselles_' + rnd() + '.zip'; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-};
+/* ---------- Enviament al servidor (Supabase Storage): una carpeta per casella, A1/, A2/… ---------- */
+const upCfg = window.UPLOAD_CONFIG || {};
+const upReady = !!(upCfg.url && upCfg.anonKey && upCfg.bucket);
+
+async function putOne(r) {
+  for (let t = 0; t < 4; t++) {
+    const res = await fetch(`${upCfg.url}/storage/v1/object/${upCfg.bucket}/${r.cell}/${r.name}`, {
+      method: 'POST', body: r.blob,
+      headers: { apikey: upCfg.anonKey, ...(upCfg.anonKey.startsWith('eyJ') ? { Authorization: 'Bearer ' + upCfg.anonKey } : {}),   // les claus noves (sb_publishable_…) només van a 'apikey'
+                 'Content-Type': 'image/png', 'x-upsert': 'false' }
+    });
+    if (res.ok) return;
+    const txt = await res.text().catch(() => '');
+    if (res.status === 409 || /duplicate|already exists/i.test(txt)) { r.name = `${r.cell}_${rnd()}.png`; continue; }   // nom repetit: en prova un altre
+    throw new Error(res.status + ' ' + txt.slice(0, 120));
+  }
+  throw new Error('nom repetit');
+}
+async function uploadAll() {
+  const todo = results.filter(r => !r.uploaded); if (!todo.length) return;
+  const total = results.length; let done = total - todo.length, fail = 0, i = 0, lastErr = '';
+  const info = $('upInfo'), upd = () => { info.textContent = `Enviant… ${done}/${total}` + (fail ? ` · ${fail} errors` : ''); info.className = 'status'; };
+  $('btnUp').classList.add('hidden'); $('btnCut').disabled = true; upd();
+  const worker = async () => {
+    while (i < todo.length) {
+      const r = todo[i++];
+      try { await putOne(r); r.uploaded = true; done++; } catch (e) { fail++; lastErr = e.message; }
+      upd();
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  $('btnCut').disabled = false;
+  if (fail) { info.textContent = `⚠ ${done}/${total} enviades; ${fail} han fallat (${lastErr}).`; info.className = 'status'; $('btnUp').classList.remove('hidden'); }
+  else { info.textContent = `✓ ${done} imatges enviades. Gràcies!`; info.className = 'status ok'; }
+}
+$('btnUp').onclick = uploadAll;
 </script>
 </body>
 </html>
