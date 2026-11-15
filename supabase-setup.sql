@@ -23,3 +23,9 @@ with check (
 create policy "llegir caselles (administrador)"
 on storage.objects for select to authenticated
 using (bucket_id = 'imatges');
+
+
+-- Esborrar imatges (només l'administrador autenticat; botó "Esborrar-ho tot" de descarregar.html)
+create policy "esborrar caselles (administrador)"
+on storage.objects for delete to authenticated
+using (bucket_id = 'imatges');
